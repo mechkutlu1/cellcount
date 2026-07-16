@@ -55,12 +55,6 @@ or iOS. Bluetooth or the Pi are the only two routes that work.
 
 Wiring, driver current limits and the command protocol are all in the sketch header.
 
-## Deploy to GitHub Pages
-
-Create a public repo, upload every file, then Settings → Pages → branch `main`, folder `/`.
-Live at `https://<username>.github.io/cellcount/`. HTTPS (which Pages provides) is required
-for both the camera and Web Bluetooth.
-
 ## Using it
 
 1. **Setup → Optical calibration.** Put a **stage micrometer** in the light path, tap
