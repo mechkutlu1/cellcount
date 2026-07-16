@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>CellCount — microscope cell counting</title>
+<meta name="description" content="Open microscope cell counting: phone camera through the eyepiece, motorised stage scanning, on-device segmentation and counting with hemocytometer concentration and trypan-blue viability. Research and education use only.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CellCount">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0d1117;      /* darkroom */
+  --slab:#161b22;      /* panel */
+  --slab2:#1c232c;
+  --line:#26303b;
+  --ink:#e6edf3;
+  --dim:#8b98a5;
+  --live:#3fb98f;      /* unstained = viable */
+  --dead:#5b8def;      /* trypan blue = non-viable */
+  --junk:#6b7684;      /* rejected debris */
+  --warn:#e0a458;
+  --hot:#d95d5d;
+  --r:12px;
+  --disp:'Space Grotesk',system-ui,sans-serif;
+  --body:'Source Sans 3',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;flex-wrap:wrap}
+header h1{font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:-.01em}
+header h1 b{color:var(--live);font-weight:700}
+header .sub{font-size:12px;color:var(--dim)}
+#btn-install{margin-left:auto;background:var(--live);border-color:var(--live);color:#06251a;
+  font-size:12px;padding:7px 12px;min-height:auto;font-weight:600}
+#ios-hint{font-size:12.5px;color:var(--dim);padding:0 16px 8px}
+#ios-hint b{color:var(--ink)}
+nav{display:flex;gap:6px;padding:0 16px 12px}
+nav button{flex:1;font-family:var(--disp);font-weight:500;font-size:13px;background:var(--slab);color:var(--dim);
+  border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--slab2);color:var(--ink);border-color:var(--live)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+main{padding:0 16px 30px;max-width:820px;margin:0 auto}
+section[hidden]{display:none}
+.card{background:var(--slab);border:1px solid var(--line);border-radius:var(--r);padding:13px;margin-bottom:12px}
+.card h2{font-family:var(--disp);font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+.note{font-size:13.5px;color:var(--dim)}
+.note b{color:var(--ink);font-weight:600}
+.mono{font-family:var(--mono)}
+
+/* eyepiece stage */
+#stage{position:relative;border-radius:var(--r);overflow:hidden;background:#05080a;aspect-ratio:4/3;border:1px solid var(--line)}
+#stage video,#stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#stage #vig{pointer-events:none;box-shadow:inset 0 0 90px 40px rgba(5,8,10,.92);border-radius:50%/12%}
+#stage .tag{position:absolute;top:8px;left:8px;font-family:var(--mono);font-size:11px;color:var(--ink);
+  background:rgba(13,17,23,.8);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+#stage .link{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:11px;
+  background:rgba(13,17,23,.8);border:1px solid var(--line);border-radius:7px;padding:3px 8px;color:var(--dim)}
+#stage .link.on{color:var(--live);border-color:var(--live)}
+
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.tile{background:var(--slab);border:1px solid var(--line);border-radius:var(--r);padding:9px 10px}
+.tile .lbl{font-family:var(--disp);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.tile .val{font-family:var(--mono);font-size:21px;font-weight:500;line-height:1.25}
+.tile .val small{font-size:11px;color:var(--dim)}
+.tile.live .val{color:var(--live)} .tile.dead .val{color:var(--dead)}
+
+/* signature: scan map */
+#mapwrap{margin-top:10px;background:var(--slab);border:1px solid var(--line);border-radius:var(--r);padding:11px}
+#map{display:grid;gap:4px;margin-top:8px}
+.fld{aspect-ratio:1;border-radius:5px;background:var(--slab2);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.fld.done{border-color:var(--live)}
+.fld.cur{outline:2px solid var(--warn);outline-offset:1px}
+.mapcap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{font-family:var(--disp);font-size:13px;font-weight:500;border-radius:var(--r);padding:11px 14px;
+  border:1px solid var(--line);background:var(--slab);color:var(--ink);cursor:pointer;min-height:46px}
+.btn.primary{background:var(--live);border-color:var(--live);color:#06251a;font-weight:700}
+.btn.stop{background:var(--hot);border-color:var(--hot);color:#2b0a0a;font-weight:700}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+.btn.on{border-color:var(--live);color:var(--live)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+label.f{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:7px}
+select,input[type=number]{font-family:var(--mono);font-size:14px;padding:8px 9px;border:1px solid var(--line);
+  border-radius:8px;background:var(--slab2);color:var(--ink);min-height:42px;width:92px}
+select{width:auto}
+.jog{display:grid;grid-template-columns:repeat(3,44px);gap:5px;justify-content:center}
+.jog button{background:var(--slab2);border:1px solid var(--line);color:var(--ink);border-radius:8px;
+  height:44px;font-family:var(--mono);cursor:pointer}
+.jog .sp{visibility:hidden}
+
+/* results */
+.hero{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:11px;margin-bottom:11px}
+.hero .big{font-family:var(--mono);font-size:38px;font-weight:500;line-height:1}
+.hero .of{color:var(--dim);font-family:var(--mono);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 5px;border-bottom:1px solid var(--line)}
+th{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+td.mono{font-family:var(--mono)}
+.caption{font-size:13px;color:var(--dim);font-style:italic;margin-top:10px;line-height:1.55}
+.empty{font-size:14px;color:var(--dim);padding:10px 2px}
+.disc{border-left:3px solid var(--hot);background:rgba(217,93,93,.08);padding:10px 12px;
+  border-radius:0 var(--r) var(--r) 0;font-size:13px;margin-top:12px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--dim);margin-top:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+@media (max-width:560px){ .tiles{grid-template-columns:repeat(2,1fr)} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cell<b>Count</b></h1>
+  <span class="sub">open microscope counting · on-device</span>
+  <button class="btn" id="btn-install" hidden>Install</button>
+</header>
+<p id="ios-hint" hidden>To install: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
+
+<nav role="tablist">
+  <button role="tab" aria-selected="true"  data-tab="scan">Scan</button>
+  <button role="tab" aria-selected="false" data-tab="result">Result</button>
+  <button role="tab" aria-selected="false" data-tab="setup">Setup</button>
+  <button role="tab" aria-selected="false" data-tab="method">Method</button>
+</nav>
+
+<main>
+<!-- ============ SCAN ============ -->
+<section id="tab-scan">
+  <div id="stage">
+    <video id="cam" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div id="vig" style="position:absolute;inset:0"></div>
+    <span class="tag" id="tag">camera off</span>
+    <span class="link" id="link">stage: none</span>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="lbl">Field count</div><div class="val" id="v-field">—</div></div>
+    <div class="tile live"><div class="lbl">Viable</div><div class="val" id="v-live">—</div></div>
+    <div class="tile dead"><div class="lbl">Non-viable</div><div class="val" id="v-dead">—</div></div>
+    <div class="tile"><div class="lbl">Rejected</div><div class="val" id="v-junk">—</div></div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--live)"></i>viable cell</span>
+    <span><i style="background:var(--dead)"></i>trypan-stained</span>
+    <span><i style="background:var(--junk)"></i>rejected debris</span>
+  </div>
+
+  <div id="mapwrap">
+    <div class="mapcap"><span>stage scan map</span><span id="mapmeta">idle</span></div>
+    <div id="map"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="btn-cam">Start camera</button>
+    <button class="btn" id="btn-count" disabled>Count field</button>
+    <button class="btn" id="btn-scan" disabled>Run scan</button>
+    <button class="btn" id="btn-demo">Demo</button>
+  </div>
+
+  <div class="card">
+    <h2>Stage jog</h2>
+    <div class="jog">
+      <button class="sp"></button><button id="j-yp">Y+</button><button class="sp"></button>
+      <button id="j-xm">X−</button><button id="j-zero">0</button><button id="j-xp">X+</button>
+      <button class="sp"></button><button id="j-ym">Y−</button><button class="sp"></button>
+    </div>
+    <p class="note" style="margin-top:9px;text-align:center">jog = <span class="mono" id="jogum">200</span> µm · position <span class="mono" id="pos">X0 Y0</span></p>
+  </div>
+</section>
+
+<!-- ============ RESULT ============ -->
+<section id="tab-result" hidden>
+  <div id="res-empty" class="empty">No count yet. Count a field, run a scan, or try Demo — Demo generates synthetic fields with known ground truth so you can check the engine before trusting a real sample.</div>
+  <div id="res-body" hidden>
+    <div class="card">
+      <div class="hero"><span class="big" id="r-conc">—</span><span class="of">cells / mL</span></div>
+      <div id="r-lines"></div>
+      <p class="caption" id="r-cap"></p>
+    </div>
+    <div class="card">
+      <h2>Per-field</h2>
+      <div style="overflow-x:auto"><table id="r-table"></table></div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="btn-csv">Export CSV</button>
+      <button class="btn" id="btn-json">Copy summary</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section id="tab-setup" hidden>
+  <div class="card">
+    <h2>Optical calibration</h2>
+    <div class="row">
+      <label class="f">µm / pixel <input type="number" id="umpx" value="0.55" step="0.01" min="0.01"></label>
+      <button class="btn" id="btn-cal">Calibrate on micrometer</button>
+    </div>
+    <p class="note" style="margin-top:9px">Everything downstream depends on this number. Put a <b>stage micrometer</b> in the light path, tap <b>Calibrate</b>, tap the two ends of a known division, and enter its length. Guessing it from the objective's nominal magnification is the single most common way to get a confidently wrong concentration.</p>
+  </div>
+  <div class="card">
+    <h2>Sample</h2>
+    <div class="row">
+      <label class="f">Cell diameter <input type="number" id="dia" value="12" step="1" min="2"> µm</label>
+      <label class="f">Dilution <input type="number" id="dil" value="2" step="0.5" min="1"> ×</label>
+      <label class="f">Chamber depth <input type="number" id="depth" value="0.1" step="0.01"> mm</label>
+      <label class="f"><input type="checkbox" id="viab" checked style="width:auto;min-height:auto"> Trypan blue viability</label>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Stage link</h2>
+    <div class="row">
+      <label class="f">Transport
+        <select id="transport">
+          <option value="sim">Simulator</option>
+          <option value="ble">Bluetooth (Android)</option>
+          <option value="ws">WebSocket → Pi</option>
+        </select></label>
+      <label class="f">µm / step <input type="number" id="umstep" value="5" step="0.1" min="0.01"></label>
+      <button class="btn" id="btn-link">Connect</button>
+    </div>
+    <div class="row" style="margin-top:9px">
+      <label class="f">Grid <input type="number" id="gx" value="3" min="1" max="8"> × <input type="number" id="gy" value="3" min="1" max="8"></label>
+      <label class="f">WS host <input type="text" id="wshost" value="ws://cellscope.local:8765" style="width:210px;font-family:var(--mono);font-size:13px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--slab2);color:var(--ink)"></label>
+    </div>
+    <p class="note" style="margin-top:9px"><b>Bluetooth</b> works from this HTTPS page on Android Chrome only — iOS has no Web Bluetooth. <b>WebSocket</b> needs the app served from the Pi itself over http, because a browser will not let an https page open a ws:// socket to your LAN. Both routes are documented in the README.</p>
+  </div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section id="tab-method" hidden>
+  <div class="card">
+    <h2>How the count is made</h2>
+    <p class="note">Each field is corrected for uneven illumination (a percentile background estimated on a coarse grid, then divided out), thresholded by Otsu, opened to remove speckle, and hole-filled — live cells are refractile rings under bright field, and without hole filling each one segments as an annulus and counts twice. Connected components are measured, then a logistic-regression classifier rejects debris on six shape and intensity features. Touching cells are separated by a chamfer distance transform: every local maximum whose inscribed radius lies in a physical band around the expected cell radius counts as one cell. Cells touching the right or bottom border are dropped and those on the top or left are kept, so a cell straddling two fields is counted exactly once.</p>
+  </div>
+  <div class="card">
+    <h2>Why there is no neural network</h2>
+    <p class="note">A CNN trained on nothing is not a CNN, it is a confident random number generator — and this tool is aimed at places where nobody can cross-check its output against a haemocytometer and a trained eye. The classifier here is a logistic regression <b>actually trained</b>, in Node, on synthetic fields with exact ground truth, using the identical feature code the app runs. <b>Its provenance is printed below.</b> Once real annotated fields exist from actual use, a TF.js U-Net is a drop-in replacement for the segmentation stage — and the validation harness to prove it helps is already written.</p>
+    <p class="note mono" id="prov" style="margin-top:8px;font-size:12px"></p>
+  </div>
+  <div class="card">
+    <h2>Concentration</h2>
+    <p class="note">For a counted area <span class="mono">A</span> mm² over a chamber of depth <span class="mono">d</span> mm, concentration = <span class="mono">N / (A·d) × 1000 × dilution</span> cells/mL. With the standard Neubauer 1 mm² square at 0.1 mm depth this reduces to the familiar <span class="mono">N × 10⁴ × dilution</span>. The reported <b>±</b> is the Poisson counting error <span class="mono">100/√N</span> %, which is the irreducible uncertainty of counting N random events — count more fields to shrink it. If the field-to-field CV is much larger than that, the sample is not mixed.</p>
+  </div>
+  <div class="card">
+    <h2>Verification and limits</h2>
+    <p class="note">The engine is validated headlessly against synthetic fields with exact ground truth: mean absolute error <b>1.54 %</b> over densities from 20 to 150 cells per field, viability within 1 %, and stable under 0.1–0.6 vignetting. Known limits: at debris loads above about half of all particles the count runs ~17 % high; cells cut by the top or left image border may be missed; out-of-focus fields flatten the refractile rim and depress the count; and the whole calibration collapses if the camera zoom changes after calibrating. <b>All validation to date is synthetic — no real sample has been counted.</b></p>
+    <div class="disc"><b>Research and education use only.</b> Not a medical device and not a diagnostic. Counting cultured cells in a haemocytometer is what this is for. Do not use it to diagnose disease, count parasites, or make any clinical decision: that requires clinical validation, regulatory approval, and a trained microscopist — and getting it wrong in a place with no second opinion is how people get hurt.</div>
+  </div>
+</section>
+</main>
+
+<script src="synth.js"></script>
+<script src="count-engine.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

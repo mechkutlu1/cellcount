@@ -1,0 +1,20 @@
+{
+  "id": "/cellcount/",
+  "name": "CellCount — microscope cell counting",
+  "short_name": "CellCount",
+  "description": "Open microscope cell counting with motorised stage scanning, on-device segmentation, hemocytometer concentration and trypan-blue viability. Research and education use only.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "portrait",
+  "categories": ["education", "science", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

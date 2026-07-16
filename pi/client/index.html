@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>CellScope — console</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--void:#0d1117;--slab:#161b22;--slab2:#1c232c;--line:#26303b;--ink:#e6edf3;--dim:#8b98a5;
+      --live:#3fb98f;--dead:#5b8def;--warn:#e0a458;--hot:#d95d5d;--r:12px;
+      --disp:'Space Grotesk',system-ui,sans-serif;--body:'Source Sans 3',system-ui,sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-bottom:env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;gap:10px;padding:14px 16px 6px;flex-wrap:wrap}
+h1{font-family:var(--disp);font-size:20px}h1 b{color:var(--live)}
+.sub{font-size:12px;color:var(--dim)}
+#conn{margin-left:auto;font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--line);color:var(--dim)}
+#conn.ok{color:var(--live);border-color:var(--live)}
+#conn.bad{color:var(--hot);border-color:var(--hot)}
+main{padding:0 16px 30px;max-width:820px;margin:0 auto}
+.card{background:var(--slab);border:1px solid var(--line);border-radius:var(--r);padding:13px;margin-bottom:12px}
+.card h2{font-family:var(--disp);font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+.note{font-size:13px;color:var(--dim)}
+.mono{font-family:var(--mono)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{background:var(--slab2);border:1px solid var(--line);border-radius:var(--r);padding:9px 10px}
+.tile .lbl{font-family:var(--disp);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.tile .val{font-family:var(--mono);font-size:20px}
+.tile.live .val{color:var(--live)}.tile.dead .val{color:var(--dead)}
+#map{display:grid;gap:4px;margin-top:8px}
+.fld{aspect-ratio:1;border-radius:5px;background:var(--slab2);border:1px solid var(--line);display:flex;
+     align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.fld.done{border-color:var(--live);color:var(--ink)}
+.fld.cur{outline:2px solid var(--warn);outline-offset:1px}
+.fld.nofocus{border-color:var(--hot)}
+.btn{font-family:var(--disp);font-size:13px;font-weight:500;border-radius:var(--r);padding:11px 14px;border:1px solid var(--line);
+     background:var(--slab2);color:var(--ink);cursor:pointer;min-height:46px}
+.btn.primary{background:var(--live);border-color:var(--live);color:#06251a;font-weight:700}
+.btn.stop{background:var(--hot);border-color:var(--hot);color:#2b0a0a;font-weight:700}
+.btn[disabled]{opacity:.4}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+label.f{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+input[type=number]{font-family:var(--mono);font-size:14px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
+  background:var(--slab2);color:var(--ink);width:70px;min-height:40px}
+.jog{display:grid;grid-template-columns:repeat(3,46px);gap:5px;justify-content:center}
+.jog button{background:var(--slab2);border:1px solid var(--line);color:var(--ink);border-radius:8px;height:46px;font-family:var(--mono)}
+.jog .sp{visibility:hidden}
+.hero{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px}
+.hero .big{font-family:var(--mono);font-size:34px}
+.hero .of{color:var(--dim);font-family:var(--mono);font-size:13px}
+.kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.kv span:last-child{font-family:var(--mono)}
+.warn{border-left:3px solid var(--warn);background:rgba(224,164,88,.09);padding:9px 11px;border-radius:0 8px 8px 0;font-size:13px;margin-top:9px}
+#phase{font-family:var(--mono);font-size:12px;color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Cell<b>Scope</b></h1><span class="sub">console</span>
+  <span id="conn">connecting…</span>
+</header>
+<main>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span id="phase">idle</span>
+      <span class="note mono" id="rig"></span>
+    </div>
+    <div class="tiles" style="margin-top:9px">
+      <div class="tile"><div class="lbl">Cells</div><div class="val" id="t-total">—</div></div>
+      <div class="tile live"><div class="lbl">Viable</div><div class="val" id="t-live">—</div></div>
+      <div class="tile dead"><div class="lbl">Dead</div><div class="val" id="t-dead">—</div></div>
+      <div class="tile"><div class="lbl">Focus Z</div><div class="val" id="t-z">—</div></div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <div class="card">
+    <h2>Run</h2>
+    <div class="row">
+      <label class="f">Grid <input type="number" id="gx" value="3" min="1" max="8"> × <input type="number" id="gy" value="3" min="1" max="8"></label>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="b-scan">Run scan</button>
+      <button class="btn" id="b-count">Count one field</button>
+      <button class="btn" id="b-focus">Autofocus</button>
+      <button class="btn" id="b-stop">Stop</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Stage</h2>
+    <div class="jog">
+      <button class="sp"></button><button data-ax="Y" data-um="200">Y+</button><button class="sp"></button>
+      <button data-ax="X" data-um="-200">X−</button><button id="b-zero">0</button><button data-ax="X" data-um="200">X+</button>
+      <button class="sp"></button><button data-ax="Y" data-um="-200">Y−</button><button class="sp"></button>
+    </div>
+    <div class="jog" style="margin-top:6px">
+      <button class="sp"></button><button data-ax="Z" data-um="5">Z+</button><button class="sp"></button>
+      <button class="sp"></button><button data-ax="Z" data-um="-5">Z−</button><button class="sp"></button>
+    </div>
+    <p class="note mono" style="text-align:center;margin-top:8px" id="pos">X0 Y0 Z0</p>
+  </div>
+
+  <div class="card" id="res" hidden>
+    <h2>Result</h2>
+    <div class="hero"><span class="big" id="r-conc">—</span><span class="of">cells / mL</span></div>
+    <div id="r-kv"></div>
+    <div id="r-warn"></div>
+    <div class="controls">
+      <button class="btn" id="b-csv">Export CSV</button>
+      <button class="btn" id="b-sync">Sync to server</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Stored on this phone</h2>
+    <p class="note" id="hist">none yet</p>
+    <p class="note" style="margin-top:8px">Results are kept in this browser so a scan is never lost when the Pi's wifi drops, and uploaded only when you press <b>Sync</b>. The Pi keeps its own copy in <span class="mono">pi/data/</span> regardless.</p>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const API = location.origin;
+let state = {}, lastResult = null;
+
+/* Server-Sent Events: plain HTTP, reconnects by itself when the Pi's wifi
+   blinks — which on a battery-powered field rig it will. */
+const es = new EventSource(API + '/api/events');
+es.onopen = () => { $('#conn').textContent = 'live'; $('#conn').className = 'ok'; };
+es.onerror = () => { $('#conn').textContent = 'reconnecting…'; $('#conn').className = 'bad'; };
+es.addEventListener('state', e => render(JSON.parse(e.data)));
+es.addEventListener('field', e => { const f = JSON.parse(e.data); });
+es.addEventListener('result', e => showResult(JSON.parse(e.data)));
+es.addEventListener('focus', e => {
+  const d = JSON.parse(e.data); $('#t-z').textContent = d.z.toFixed(1);
+});
+
+function render(s) {
+  state = s;
+  $('#phase').textContent = s.phase + (s.nFields ? `  ${s.field}/${s.nFields}` : '');
+  $('#rig').textContent = `${s.stage} · ${s.camera}${s.sim ? ' · SIMULATED' : ''}`;
+  $('#pos').textContent = `X${Math.round(s.pos.X)} Y${Math.round(s.pos.Y)} Z${Math.round(s.pos.Z)}`;
+  if (s.focusZ != null) $('#t-z').textContent = s.focusZ.toFixed(1);
+  const tot = s.fields.reduce((a, f) => a + f.total, 0);
+  const liv = s.fields.reduce((a, f) => a + f.live, 0);
+  const ded = s.fields.reduce((a, f) => a + f.dead, 0);
+  $('#t-total').textContent = s.fields.length ? tot : '—';
+  $('#t-live').textContent = s.fields.length ? liv : '—';
+  $('#t-dead').textContent = s.fields.length ? ded : '—';
+  const gx = +$('#gx').value, gy = +$('#gy').value;
+  const n = s.nFields || gx * gy;
+  const cols = s.nFields ? gx : gx;
+  $('#map').style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  $('#map').innerHTML = Array.from({ length: n }, (_, i) => {
+    const f = s.fields[i];
+    const cls = ['fld', f ? 'done' : '', i === s.field && s.phase !== 'done' ? 'cur' : '',
+                 f && f.focusOk === false ? 'nofocus' : ''].join(' ');
+    return `<div class="${cls}" title="${f && f.focusOk === false ? 'focus failed' : ''}">${f ? f.total : ''}</div>`;
+  }).join('');
+  $('#b-scan').disabled = s.busy;
+}
+
+function showResult(a) {
+  lastResult = a;
+  $('#res').hidden = false;
+  $('#r-conc').textContent = a.concentrationPerMl ? a.concentrationPerMl.toExponential(2) : '—';
+  const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+  $('#r-kv').innerHTML =
+    kv('Cells counted', a.total) + kv('Fields', a.nFields) +
+    kv('Counting precision (Poisson)', a.relSePercent ? '± ' + a.relSePercent.toFixed(1) + ' %' : '—') +
+    kv('Field-to-field CV', a.cvPercent != null ? a.cvPercent.toFixed(1) + ' %' : '—') +
+    kv('Viability', a.viability != null ? a.viability.toFixed(1) + ' %' : '—') +
+    kv('Area', a.areaMm2.toFixed(4) + ' mm²');
+  let w = '';
+  if (a.total < 100) w += `<div class="warn"><b>Only ${a.total} cells counted.</b> Poisson error alone is ±${a.relSePercent.toFixed(0)}%. Protocol is to count at least 100 — scan more fields or use a less dilute sample.</div>`;
+  if (a.cvPercent > 2.5 * a.relSePercent) w += `<div class="warn"><b>Fields disagree more than chance allows.</b> CV ${a.cvPercent.toFixed(0)}% against a Poisson expectation of ${a.relSePercent.toFixed(0)}% — the sample is probably not evenly mixed.</div>`;
+  $('#r-warn').innerHTML = w;
+  const h = store();
+  h.push({ at: new Date().toISOString(), ...a, synced: false });
+  localStorage.setItem('cellscope.results', JSON.stringify(h.slice(-200)));
+  drawHist();
+}
+
+const store = () => { try { return JSON.parse(localStorage.getItem('cellscope.results') || '[]'); } catch { return []; } };
+function drawHist() {
+  const h = store();
+  $('#hist').textContent = h.length
+    ? `${h.length} result(s) stored, ${h.filter(x => !x.synced).length} not yet synced.`
+    : 'none yet';
+}
+drawHist();
+
+const post = (p, b) => fetch(API + p, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(b || {}) }).then(r => r.json());
+$('#b-scan').addEventListener('click', () => post('/api/scan', { gx: +$('#gx').value, gy: +$('#gy').value }));
+$('#b-stop').addEventListener('click', () => post('/api/stop'));
+$('#b-focus').addEventListener('click', () => post('/api/focus'));
+$('#b-count').addEventListener('click', () => post('/api/count'));
+$('#b-zero').addEventListener('click', () => post('/api/zero'));
+document.querySelectorAll('.jog button[data-ax]').forEach(b =>
+  b.addEventListener('click', () => post('/api/jog', { axis: b.dataset.ax, um: +b.dataset.um })));
+$('#gx').addEventListener('input', () => render(state));
+$('#gy').addEventListener('input', () => render(state));
+
+$('#b-csv').addEventListener('click', () => {
+  const h = store();
+  if (!h.length) return;
+  const rows = ['at,cells,fields,concentration_per_ml,viability_pct,poisson_se_pct,cv_pct,area_mm2']
+    .concat(h.map(r => [r.at, r.total, r.nFields, r.concentrationPerMl, r.viability ?? '',
+                        r.relSePercent ?? '', r.cvPercent ?? '', r.areaMm2].join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+  a.download = 'cellscope-results.csv'; a.click();
+});
+
+/* Sync is deliberately manual and deliberately last. The instrument works
+   with no network at all; uploading is a convenience, never a dependency. */
+$('#b-sync').addEventListener('click', async () => {
+  const url = localStorage.getItem('cellscope.syncUrl') ||
+              prompt('Server endpoint to POST results to:', 'https://example.org/api/cellcounts');
+  if (!url) return;
+  localStorage.setItem('cellscope.syncUrl', url);
+  const h = store(); const pending = h.filter(x => !x.synced);
+  if (!pending.length) return alert('Nothing to sync.');
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                 body: JSON.stringify(pending) });
+    if (!r.ok) throw new Error('server returned ' + r.status);
+    for (const x of h) x.synced = true;
+    localStorage.setItem('cellscope.results', JSON.stringify(h));
+    drawHist(); alert(`Synced ${pending.length} result(s).`);
+  } catch (e) { alert('Sync failed, results kept on the phone: ' + e.message); }
+});
+</script>
+</body>
+</html>
